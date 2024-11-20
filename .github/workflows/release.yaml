@@ -9,47 +9,15 @@ on:
       - '**/Chart.yaml'
 
 jobs:
- get-list-of-charts:
-    runs-on: ubuntu-latest
-    name: 'Get list of charts to be released'
-    outputs:
-      charts: ${{ steps.get-charts.outputs.charts }}
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - id: get-charts
-        name: Get list of charts to be released
-        run: |
-          # Get list of Chart.yaml files changed in the last commit
-          files_changed="$(git show --pretty="" --name-only | grep Chart.yaml)"
-
-          charts=()
-          for file in $files_changed; do
-            count=$(git show "$file" | grep -c "+version" || true)
-            if [ $count -eq 0 ]; then
-              echo "No version change in $file"
-              continue
-            fi
-
-            charts+=("$(echo "$file" | xargs dirname)")
-          done
-
-          if [ ${#charts[@]} -eq 0 ]; then
-            echo "No charts to be released"
-            echo "charts=none" >> "$GITHUB_OUTPUT"
-          else
-          echo "charts=$(jq 'split(" ")' -Rc <(echo ${charts[@]}))" >> "$GITHUB_OUTPUT"
-          fi
-
  release-charts:
     runs-on: ubuntu-latest
-    needs: get-list-of-charts
-    if: needs.get-list-of-charts.outputs.charts != 'none'
-    
     strategy:
       matrix:
-        chart: ${{ fromJson(needs.get-list-of-charts.outputs.charts) }}
+        chart:
+          - tyk-oss
+          - tyk-stack
+          - tyk-control-plane
+          - tyk-data-plane
 
     steps:
       - name: Git Checkout
@@ -67,14 +35,14 @@ jobs:
       - name: Helm Chart package file name
         id: file-name
         run: |
-          echo "fileName=$(basename ${{ matrix.chart }})-${{ steps.chart-version.outputs.version }}.tgz"
-          echo "fileName=$(basename ${{ matrix.chart }})-${{ steps.chart-version.outputs.version }}.tgz" >> "$GITHUB_OUTPUT"
+          echo "fileName=$(basename ${{ matrix.chart }})-v2.1.1-alpha.tgz"
+          echo "fileName=$(basename ${{ matrix.chart }})-v2.1.1-alpha.tgz" >> "$GITHUB_OUTPUT"
 
       - name: Update dependencies
         run: helm dependency update ${{ matrix.chart }}
 
       - name: Package Helm Chart
-        run: helm package ${{ matrix.chart }} --version ${{ steps.chart-version.outputs.version }}
+        run: helm package ${{ matrix.chart }} --version v2.1.1-alpha
 
       - name: Push Helm Chart
         uses: cloudsmith-io/action@v0.5.2
